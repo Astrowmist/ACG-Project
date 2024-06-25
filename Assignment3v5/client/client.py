@@ -10,6 +10,7 @@ import socket
 import time
 global host, portj
 
+
 host = socket.gethostname()
 port = 8888         # The port used by the server
 cmd_GET_MENU = b"GET_MENU"
