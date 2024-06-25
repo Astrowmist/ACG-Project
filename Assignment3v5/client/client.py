@@ -10,6 +10,7 @@ import socket
 import time
 global host, port
 
+p
 
 host = socket.gethostname()
 port = 8888         # The port used by the server
