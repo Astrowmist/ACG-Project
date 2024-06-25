@@ -8,7 +8,7 @@ import datetime
 import sys              # handle system error
 import socket
 import time
-global host, portj
+global host, port
 
 host = socket.gethostname()
 port = 8888         # The port used by the server
