@@ -14,12 +14,14 @@ cmd_GET_MENU = "GET_MENU"
 cmd_END_DAY = "CLOSING"
 default_menu = "menu_today.txt"
 default_save_base = "result-"
+hash="hash.txt"
 
 host = socket.gethostname() # get the hostname or ip address
 port = 8888                 # The port used by the server
 
 def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):  
     blk_count = 0
+    hash_object = hashlib.sha512()
     net_bytes = conn.recv(MAX_BUFFER_SIZE)
     dest_file = open("temp","w")  # temp file is to satisfy the syntax rule. Can ignore the file.
     while net_bytes != b'':
@@ -33,19 +35,15 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
                     sys.exit(0)
                 while True:
                     read_bytes = src_file.read(MAX_BUFFER_SIZE)
-                    hash_object = hashlib.sha256()
-                    hash_object.update(read_bytes)
-                    hash_hex = hash_object.hexdigest()
-                    
-                    with open(read_bytes, 'w') as output_file:
-                        output_file.write(hash_hex)
+                    hash_object.update(read_bytes) # Add the file bytes to hash object
                                     
                     if read_bytes == b'':
                         break
-                    #hints: you may apply a scheme (hashing/encryption) to read_bytes before sending to client.
                     conn.send(read_bytes)
                 src_file.close()
-                print("Processed SENDING menu") 
+                hash_hex = hash_object.hexdigest() # Calculate SHA-256 hash
+                conn.send(hash_hex.encode('utf-8')) # Send the hash
+                print("Processed SENDING menu and hash") 
                 return
             elif cmd_END_DAY in usr_cmd: # ask for to save end day order
                 #Hints: the net_bytes after the cmd_END_DAY may be encrypted. 

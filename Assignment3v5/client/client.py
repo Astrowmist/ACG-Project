@@ -8,6 +8,7 @@ import datetime
 import sys              # handle system error
 import socket
 import time
+import hashlib          # for hashing
 global host, port
 
 host = socket.gethostname()
@@ -21,10 +22,23 @@ return_file = "day_end.csv"
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
     my_socket.connect((host, port))
     my_socket.sendall(cmd_GET_MENU )
-    data = my_socket.recv(4096)
-    #hints : need to apply a scheme to verify the integrity of data.  
+    received_data = b''
+    while True:
+        data = my_socket.recv(4096)
+        if not data:
+            break
+        received_data += data
+    file_data = received_data[:-128]  # File data (all except last 128 characters)
+    received_hash = received_data[-128:].decode("utf8").rstrip()  # Last 128 characters are the hash
+    hash_object = hashlib.sha512()
+    hash_object.update(file_data)
+    hash_hex = hash_object.hexdigest()
+    if(hash_hex != received_hash):
+        print('\nHash does not match !!! Menu has been corrupted or altered !!! Ending connection... \n')
+        my_socket.close()
+        sys.exit(0)
     menu_file = open(menu_file,"wb")
-    menu_file.write( data)
+    menu_file.write(file_data)
     menu_file.close()
     my_socket.close()
 print('Menu today received from server')
