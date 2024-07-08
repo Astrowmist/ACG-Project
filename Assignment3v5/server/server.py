@@ -1,7 +1,6 @@
 # ------------------------------------------------------------------------------------------
 # Server.py
 # ------------------------------------------------------------------------------------------
-
 from threading import Thread    # for handling task in separate jobs we need threading
 import socket           # tcp protocol
 import datetime         # for composing date/time stamp
@@ -113,35 +112,6 @@ if(data_hash != hashCheck):
 host = socket.gethostname() # get the hostname or ip address
 port = 8888                 # The port used by the server
 
-# RSA Key Generation
-private_key = RSA.generate(2048)
-public_key = private_key.publickey()
-
-
-# AES block size
-BLOCK_SIZE = 16
-
-# Function to decrypt AES key
-def rsa_decrypt(encrypted_key):
-    cipher_rsa = PKCS1_OAEP.new(private_key)
-    return cipher_rsa.decrypt(encrypted_key)
-
-# Function to encrypt data
-def aes_encrypt(data, key):
-    cipher = AES.new(key, AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(pad(data, BLOCK_SIZE))
-    iv = cipher.iv
-    return base64.b64encode(iv + ct_bytes).decode('utf-8')
-
-# Function to decrypt data
-def aes_decrypt(enc_data, key):
-    enc_data = base64.b64decode(enc_data)
-    iv = enc_data[:BLOCK_SIZE]
-    ct = enc_data[BLOCK_SIZE:]
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    return unpad(cipher.decrypt(ct), BLOCK_SIZE)
-
-
 def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):  
     blk_count = 0
     dayEnd=b''
@@ -240,4 +210,3 @@ def start_server():
     return
 
 start_server()  
-
