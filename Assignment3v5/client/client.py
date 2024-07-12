@@ -12,13 +12,16 @@ import hashlib          # for hashing
 import getpass          # Prevents the password from echoing to the terminal when typed
 from hashlib import sha256
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives import padding,hashes
+from cryptography.hazmat.primitives.asymmetric import padding as asymmetricPadding
 global host, port
 
 host = socket.gethostname()
 port = 8888         # The port used by the server
 cmd_GET_MENU = b"GET_MENU"
+cmd_KEY_EXCHANGE = b"KEYS"
 cmd_END_DAY = b"CLOSING"
 menu_file = "menu.csv"
 return_file = "day_end"
@@ -42,7 +45,7 @@ def decrypt_file(password: str):
             encrypted_data_with_hash = f.read()
     except:
         print("file not found : " + return_file)
-        sys.exit(0)
+        sys.exit(1)
 
     # Separate the encrypted data and the hash
     encrypted_data = encrypted_data_with_hash[:-64]
@@ -66,7 +69,34 @@ def decrypt_file(password: str):
     hashCheck=hashlib.sha512(decrypted_data).digest()
     return decrypted_data,data_hash,hashCheck
 
-password = getpass.getpass(prompt='Enter day_end Password: ')
+
+def load_private_key(file_path: str):
+    global attempt  # Declare that we're using the global attempt variable
+    while attempt < 3:
+        try:
+            password = getpass.getpass(prompt="Enter the password to decrypt the private key: ").encode()
+            with open(file_path, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=password,
+                    backend=default_backend()
+                )
+            print("Private key successfully loaded.")
+            return private_key
+        except ValueError:
+            print("Incorrect password. Please try again.")
+            attempt += 1
+    print("Too many incorrect attempts. Exiting.")
+    sys.exit(1)
+
+
+def load_public_key(file_path: str):
+    with open(file_path, "rb") as key_file:
+        public_key = serialization.load_pem_public_key(
+            key_file.read(),
+            backend=default_backend()
+        )
+    return public_key
 
 for _ in (True,):
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
@@ -101,6 +131,7 @@ for _ in (True,):
 #print('Received', repr(data))  # for debugging use
 my_socket.close()
 
+password = getpass.getpass(prompt='Enter day_end Password: ')
 try:
     decrypted_day_end,data_hash,hashCheck = decrypt_file(password)
 except IncorrectPasswordError:
@@ -113,17 +144,61 @@ except:
 if(data_hash != hashCheck):
     print('\n***Error: Hash does not match! The Stored Day End Sales File has been corrupted or altered! day_end File has not been sent.***\n')
     sys.exit(0)
+attempt =0
+private_key=load_private_key("./clientKeys/private_key.pem")
+public_key=load_public_key("./clientKeys/public_key.pem")
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
+    my_socket.connect((host, port))
+    my_socket.sendall(cmd_KEY_EXCHANGE)
+    received_key_bytes = my_socket.recv(4096)
+    server_public_key = serialization.load_pem_public_key(
+        received_key_bytes,
+        backend=default_backend()
+    )
+
+    public_key_bytes = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    # Send the public key
+    my_socket.sendall(public_key_bytes)
+    print('sent key')
+    my_socket.close()
+print('Keys Successfully exchanged')
+#print('Sent', repr(sent_bytes))  # for debugging use
+my_socket.close()
+
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
     my_socket.connect((host, port))
     my_socket.sendall(cmd_END_DAY)
 
+    encrypted_data = server_public_key.encrypt(
+        decrypted_day_end,
+        asymmetricPadding.OAEP(
+            mgf=asymmetricPadding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    signature = private_key.sign(
+        decrypted_day_end,
+        asymmetricPadding.PSS(
+            mgf=asymmetricPadding.MGF1(hashes.SHA256()),
+            salt_length=asymmetricPadding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
     sent_bytes = 0
-    while sent_bytes < len(decrypted_day_end):
-        chunk = decrypted_day_end[sent_bytes:sent_bytes+1024]
+    print(len(encrypted_data))
+    while sent_bytes < len(encrypted_data):
+        chunk = encrypted_data[sent_bytes:sent_bytes+1024]
         my_socket.send(chunk)
         sent_bytes += len(chunk)
+    my_socket.sendall(signature)
     my_socket.close()
 print('Sale of the day sent to server')
 #print('Sent', repr(sent_bytes))  # for debugging use
 my_socket.close()
+

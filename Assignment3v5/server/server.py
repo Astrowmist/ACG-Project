@@ -12,11 +12,14 @@ import getpass          # Prevents the password from echoing to the terminal whe
 from hashlib import sha256
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives import padding,hashes
+from cryptography.hazmat.primitives.asymmetric import padding as asymmetricPadding
 global host, port
 
 cmd_GET_MENU = "GET_MENU"
+cmd_KEY_EXCHANGE = "KEYS"
 cmd_END_DAY = "CLOSING"
 default_menu = "menu_today"
 default_save_base = "result-"
@@ -94,6 +97,34 @@ def decrypt_file(password: str):
 
     return decrypted_data,data_hash,hashCheck
 
+def load_private_key(file_path: str):
+    global attempt  # Declare that we're using the global attempt variable
+    while attempt < 3:
+        try:
+            password = getpass.getpass(prompt="Enter the password to decrypt the private key: ").encode()
+            with open(file_path, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=password,
+                    backend=default_backend()
+                )
+            print("Private key successfully loaded.")
+            return private_key
+        except ValueError:
+            print("Incorrect password. Please try again.")
+            attempt += 1
+    print("Too many incorrect attempts. Exiting.")
+    sys.exit(1)
+
+
+def load_public_key(file_path: str):
+    with open(file_path, "rb") as key_file:
+        public_key = serialization.load_pem_public_key(
+            key_file.read(),
+            backend=default_backend()
+        )
+    return public_key
+
 
 password = getpass.getpass(prompt='Enter menu Password: ')
 try:
@@ -108,7 +139,11 @@ except:
 if(data_hash != hashCheck):
     print('\n***Error: Hash does not match !!! The Stored Menu File has been corrupted or altered !!!***\n')
     sys.exit(0)
-    
+
+attempt=0
+private_key=load_private_key("./serverKeys/private_key.pem")
+public_key=load_public_key("./serverKeys/public_key.pem")
+client_public_keyArr = []  # Initialize client_public_key to None
 host = socket.gethostname() # get the hostname or ip address
 port = 8888                 # The port used by the server
 
@@ -144,6 +179,20 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
                 conn.send(hash_hex.encode('utf-8')) # Send the hash
                 print("Processed SENDING menu and hash") 
                 return
+            elif cmd_KEY_EXCHANGE in usr_cmd:
+                public_key_bytes = public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                # Send the public key
+                conn.sendall(public_key_bytes)
+                print("\nServer's public key sent to client")
+
+                received_key_bytes = conn.recv(MAX_BUFFER_SIZE)
+                print("\nClient's public key received")
+                client_public_keyArr.append(received_key_bytes)
+                print("Key Exchange completed")
+                return
             elif cmd_END_DAY in usr_cmd: # ask for to save end day order
                 #Hints: the net_bytes after the cmd_END_DAY may be encrypted. 
                 now = datetime.datetime.now()
@@ -159,9 +208,47 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
             dayEnd+=net_bytes
     # last block / empty block
     dest_file.close()
-    encrypt_file_and_store(dayEnd, password, filename)
+    file_data = dayEnd[:-256]  
+    signature = dayEnd[-256:]  
+    print(len(file_data))
+    print(len(signature))
+
+    try:
+        decrypted_day_end = private_key.decrypt(
+            file_data,
+            asymmetricPadding.OAEP(
+                mgf=asymmetricPadding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+    except:
+        print("***Error: Decryption of received Day End Sales failed. Key is incorrect***")
+        return
+    
+    # Verify the signature
+    try:
+        client_public_key = serialization.load_pem_public_key(
+            client_public_keyArr[0],
+            backend=default_backend()
+        )
+        client_public_key.verify(
+            signature,
+            decrypted_day_end,  # or ciphertext, depending on what was signed
+            asymmetricPadding.PSS(
+                mgf=asymmetricPadding.MGF1(hashes.SHA256()),
+                salt_length=asymmetricPadding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        print("Signature is valid.")
+    except:
+        print("Signature is invalid. File not saved")
+        return
+    encrypt_file_and_store(decrypted_day_end, password, filename)
     time.sleep(3)
     print("Processed CLOSING done") 
+    client_public_keyArr.pop()
     return
 
 def client_thread(conn, ip, port, MAX_BUFFER_SIZE = 4096):

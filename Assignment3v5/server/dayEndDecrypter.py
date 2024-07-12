@@ -49,7 +49,7 @@ def decrypt_file(encrypted_file_path: str, password: str):
         decrypted_file_path = "plaintext"
         with open(decrypted_file_path, 'wb') as f:
             f.write(decrypted_data)
-        print(f'/nFile decrypted and saved to {decrypted_file_path}')
+        print(f'\nFile decrypted and saved to {decrypted_file_path}')
 
 
 # Example usage
