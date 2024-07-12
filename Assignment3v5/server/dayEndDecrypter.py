@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 from hashlib import sha256,sha512
+import getpass
 
 def derive_key(password: str):
     # Derive the AES key from the password directly
@@ -53,7 +54,7 @@ def decrypt_file(encrypted_file_path: str, password: str):
 
 
 # Example usage
-password = input('Password: ')
+password = getpass.getpass(prompt='Password: ')
 encrypted_file_path = input('FilePath: ')
 decrypt_file(encrypted_file_path, password)
 
