@@ -20,11 +20,48 @@ global host, port
 
 host = socket.gethostname()
 port = 8888         # The port used by the server
+cmd_AUTH = b"AUTH"
 cmd_GET_MENU = b"GET_MENU"
 cmd_KEY_EXCHANGE = b"KEYS"
 cmd_END_DAY = b"CLOSING"
 menu_file = "menu.csv"
 return_file = "day_end"
+
+# Function for authentication
+def authenticate(my_socket):
+
+    response = my_socket.recv(1024).decode() # Receive initial response from server (username input)
+
+    while "Authentication successful" not in response: # Checks for authentication status
+
+        if "successful" in response:
+            print("Authentication successful.")
+        
+        if "closed" in response:
+            print("Too many failed attempts. Connection closed.\n")
+            sys.exit()
+
+        username = input(f'{response}')
+        while username == '': # Checks for empty string value
+            print('Username cannot be empty.')
+            username = input(f'{response}')
+        my_socket.sendall(username.encode()) # Sends username of client to server
+
+        response = my_socket.recv(1024).decode() # Receives response from server (password input)
+
+        password = getpass.getpass(response)
+        while password == '': # Checks for empty string value
+            print('Password cannot be empty.')
+            password = getpass.getpass(response)
+        my_socket.sendall(password.encode()) # Sends password of client to server
+
+        response = my_socket.recv(1024).decode() # Receives authentication status from server
+
+        if "Authentication failed" in response:
+            print(response)
+            response = my_socket.recv(1024).decode()
+
+    print("Authentication successful.")
 
 def derive_key(password: str):
     # Derive the AES key from the password directly
@@ -97,6 +134,14 @@ def load_public_key(file_path: str):
             backend=default_backend()
         )
     return public_key
+
+# Socket for Authentication
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket: # Socket for authentication
+    my_socket.connect((host, port))
+    my_socket.sendall(cmd_AUTH)
+    authenticate(my_socket)
+
+    my_socket.close()
 
 for _ in (True,):
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:

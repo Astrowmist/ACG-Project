@@ -9,6 +9,7 @@ import traceback        # for print_exc function
 import time             # for delay purpose
 import hashlib          # for hashing
 import getpass          # Prevents the password from echoing to the terminal when typed
+import bcrypt           # For managing passwords
 from hashlib import sha256
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -18,13 +19,64 @@ from cryptography.hazmat.primitives import padding,hashes
 from cryptography.hazmat.primitives.asymmetric import padding as asymmetricPadding
 global host, port
 
+cmd_AUTH = "AUTH"
 cmd_GET_MENU = "GET_MENU"
 cmd_KEY_EXCHANGE = "KEYS"
 cmd_END_DAY = "CLOSING"
 default_menu = "menu_today"
 default_save_base = "result-"
 
+def load_credentials(): # Loads credentials.txt for server computing
+    credentials = {}
+    with open("credentials.txt", "r") as f:
+        for line in f:
+            username, hashed = line.strip().split(':')
+            credentials[username] = hashed
+    return credentials
 
+def authenticate(conn, credentials): # Function for authenticating client username and password
+    attempts = 0
+    while attempts < 3: # Client must enter correct credentials in 3 attempts
+        authentication = False # Initial authentication value set to False
+
+        conn.sendall(b"Username: ") # Prompts for client username
+        username = conn.recv(1024).decode().strip() # Receives client username input
+        print(f"Received username: {username}")  # Debugging
+
+        if username in credentials:
+            authentication = True
+    
+        else:
+            authentication = False
+
+        conn.sendall(b"Password: ") # Prompts for client password
+        password = conn.recv(1024).decode().strip() # Receives client password input
+        print(f"Received password: {password}")  # Debugging
+
+        try: # Authenticates client password
+            if bcrypt.checkpw(password.encode(), credentials[username].encode()):
+                authentication = True
+
+            else:
+                authentication = False
+
+        except: # Handles client usernames that do not exist
+            authentication = False
+
+        if authentication == True: 
+            conn.sendall(b"Authentication successful\n")
+            return True # authenticate function returns True
+        
+        else:
+            conn.sendall(b"Authentication failed. Try again.\n")
+            attempts += 1 # Increment attept by 1 per failed attempt
+
+        if attempts == 3: # Handles final attempt 3 if authentication failed
+            conn.sendall(b"Too many failed attempts. Connection closed.\n")
+            print("Too many failed attempts. Connection closed.\n")
+            conn.close()
+            return False # authenticate function returns False
+        
 def derive_key(password: str):
     # Derive the AES key from the password directly
     return sha256(password.encode()).digest()
@@ -147,7 +199,7 @@ client_public_keyArr = []  # Initialize client_public_key to None
 host = socket.gethostname() # get the hostname or ip address
 port = 8888                 # The port used by the server
 
-def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):  
+def process_connection( conn , ip_addr, MAX_BUFFER_SIZE): 
     blk_count = 0
     dayEnd=b''
     hash_object = hashlib.sha512()
@@ -156,7 +208,11 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
     while net_bytes != b'':
         if blk_count == 0: #  1st block
             usr_cmd = net_bytes[0:15].decode("utf8").rstrip()
-            if cmd_GET_MENU in usr_cmd: # ask for menu
+            if cmd_AUTH in usr_cmd:
+                credentials = load_credentials() # Loads credentials from credentials.txt
+                if not authenticate(conn, credentials): # Returns value from authenticate function
+                    return # Exits function and closes connection as a result
+            elif cmd_GET_MENU in usr_cmd: # ask for menu
                 try:
                     decrypted_menu,data_hash,hashCheck = decrypt_file(password)
                 except:
