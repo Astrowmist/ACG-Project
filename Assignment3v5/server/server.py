@@ -210,8 +210,6 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
     dest_file.close()
     file_data = dayEnd[:-256]  
     signature = dayEnd[-256:]  
-    print(len(file_data))
-    print(len(signature))
 
     try:
         decrypted_day_end = private_key.decrypt(
