@@ -236,7 +236,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
         hashes.SHA256()
     )
     sent_bytes = 0
-    print(len(encrypted_data))
     while sent_bytes < len(encrypted_data):
         chunk = encrypted_data[sent_bytes:sent_bytes+1024]
         my_socket.send(chunk)
