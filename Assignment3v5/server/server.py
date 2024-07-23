@@ -26,6 +26,7 @@ cmd_END_DAY = "CLOSING"
 default_menu = "menu_today"
 default_save_base = "result-"
 
+# Done by XAVION
 def load_credentials(): # Loads credentials.txt for server computing
     credentials = {}
     with open("credentials.txt", "r") as f:
@@ -33,7 +34,7 @@ def load_credentials(): # Loads credentials.txt for server computing
             username, hashed = line.strip().split(':')
             credentials[username] = hashed
     return credentials
-
+# Done by XAVION
 def authenticate(conn, credentials): # Function for authenticating client username and password
     attempts = 0
     while attempts < 3: # Client must enter correct credentials in 3 attempts
@@ -77,11 +78,12 @@ def authenticate(conn, credentials): # Function for authenticating client userna
             conn.close()
             return False # authenticate function returns False
         
+# Done by BRANDON    
 def derive_key(password: str):
     # Derive the AES key from the password directly
     return sha256(password.encode()).digest()
 
-
+# Done by BRANDON
 def encrypt_file_and_store(data, password , writeFile):
     # Derive the AES key from the password
     key = derive_key(password)
@@ -114,6 +116,7 @@ def encrypt_file_and_store(data, password , writeFile):
 class IncorrectPasswordError(Exception):
     pass
 
+# Done by BRANDON
 def decrypt_file(password: str):
     # Derive the AES key from the password
     key = derive_key(password)
@@ -149,6 +152,7 @@ def decrypt_file(password: str):
 
     return decrypted_data,data_hash,hashCheck
 
+# Done by ROWHITH
 def load_private_key(file_path: str):
     global attempt  # Declare that we're using the global attempt variable
     while attempt < 3:
@@ -168,7 +172,6 @@ def load_private_key(file_path: str):
     print("Too many incorrect attempts. Exiting.")
     sys.exit(1)
 
-
 def load_public_key(file_path: str):
     with open(file_path, "rb") as key_file:
         public_key = serialization.load_pem_public_key(
@@ -177,7 +180,7 @@ def load_public_key(file_path: str):
         )
     return public_key
 
-
+# Done by BRANDON
 password = getpass.getpass(prompt='Enter menu Password: ')
 try:
     decrypted_menu,data_hash,hashCheck = decrypt_file(password)
@@ -214,6 +217,7 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
                     return # Exits function and closes connection as a result
             elif cmd_GET_MENU in usr_cmd: # ask for menu
                 try:
+                    # Done by BRANDON
                     decrypted_menu,data_hash,hashCheck = decrypt_file(password)
                 except:
                     print("***Error: Menu has been altered!***")
@@ -225,6 +229,7 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
                    return
                 print("Menu File decrypted and ready to be sent!\n")
                 sent_bytes = 0
+                # Done by YU JIE
                 while sent_bytes < len(decrypted_menu):
                     chunk = decrypted_menu[sent_bytes:sent_bytes+MAX_BUFFER_SIZE]
                     conn.send(chunk)
@@ -236,6 +241,7 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
                 print("Processed SENDING menu and hash") 
                 return
             elif cmd_KEY_EXCHANGE in usr_cmd:
+                # Done by ROWHITH
                 public_key_bytes = public_key.public_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
@@ -266,7 +272,7 @@ def process_connection( conn , ip_addr, MAX_BUFFER_SIZE):
     dest_file.close()
     file_data = dayEnd[:-256]  
     signature = dayEnd[-256:]  
-
+# Done by ROWHITH
     try:
         decrypted_day_end = private_key.decrypt(
             file_data,

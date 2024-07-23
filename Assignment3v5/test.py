@@ -1,0 +1,3 @@
+x='WhtKUx3A7v4neyFZp2muwd/NFkQDSWkRaf0DBIulDWPr1/SVQlMW8VcQCPSwYp16fwOfQcZqXZM78q2X/d32Ug=='
+y='WhtKUx3A7v4neyFZp2muwd/NFkQDSWkRaf0DBIulDWPr1/SVQlMW8VcQCPSwYp16fwOfQcZqXZM78q2X/d32Ug=='
+print(x==y)

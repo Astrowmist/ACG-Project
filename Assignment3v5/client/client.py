@@ -28,6 +28,7 @@ menu_file = "menu.csv"
 return_file = "day_end"
 
 # Function for authentication
+# Done by XAVION
 def authenticate(my_socket):
 
     response = my_socket.recv(1024).decode() # Receive initial response from server (username input)
@@ -63,6 +64,7 @@ def authenticate(my_socket):
 
     print("Authentication successful.")
 
+# Done by BRANDON
 def derive_key(password: str):
     # Derive the AES key from the password directly
     return sha256(password.encode()).digest()
@@ -70,7 +72,7 @@ def derive_key(password: str):
 
 class IncorrectPasswordError(Exception):
     pass
-
+# Done by BRANDON
 def decrypt_file(password: str):
     # Derive the AES key from the password
     key = derive_key(password)
@@ -106,7 +108,7 @@ def decrypt_file(password: str):
     hashCheck=hashlib.sha512(decrypted_data).digest()
     return decrypted_data,data_hash,hashCheck
 
-
+# Done by ROWHITH
 def load_private_key(file_path: str):
     global attempt  # Declare that we're using the global attempt variable
     while attempt < 3:
@@ -126,7 +128,7 @@ def load_private_key(file_path: str):
     print("Too many incorrect attempts. Exiting.")
     sys.exit(1)
 
-
+# Done by ROWHITH
 def load_public_key(file_path: str):
     with open(file_path, "rb") as key_file:
         public_key = serialization.load_pem_public_key(
@@ -135,6 +137,7 @@ def load_public_key(file_path: str):
         )
     return public_key
 
+# Done by XAVION
 # Socket for Authentication
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket: # Socket for authentication
     my_socket.connect((host, port))
@@ -158,7 +161,7 @@ for _ in (True,):
         print(received_data.decode("utf8").rstrip())
         my_socket.close()
         break
-
+# Done by YU JIE
     file_data = received_data[:-128]  # File data (all except last 128 characters)
     received_hash = received_data[-128:].decode("utf8").rstrip()  # Last 128 characters are the hash
     hash_object = hashlib.sha512()
@@ -177,6 +180,7 @@ for _ in (True,):
 my_socket.close()
 
 password = getpass.getpass(prompt='Enter day_end Password: ')
+# Done by BRANDON
 try:
     decrypted_day_end,data_hash,hashCheck = decrypt_file(password)
 except IncorrectPasswordError:
@@ -193,6 +197,7 @@ attempt =0
 private_key=load_private_key("./clientKeys/private_key.pem")
 public_key=load_public_key("./clientKeys/public_key.pem")
 
+# Key Exchange Done by ROWHITH
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
     my_socket.connect((host, port))
     my_socket.sendall(cmd_KEY_EXCHANGE)
@@ -218,7 +223,7 @@ my_socket.close()
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as my_socket:
     my_socket.connect((host, port))
     my_socket.sendall(cmd_END_DAY)
-
+# Done by ROWHITH
     encrypted_data = server_public_key.encrypt(
         decrypted_day_end,
         asymmetricPadding.OAEP(
